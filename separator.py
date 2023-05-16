@@ -20,9 +20,9 @@ def decompose(spectogram: np.ndarray, n_instruments: int, variant=''):
     return W, H
 
 if __name__ == '__main__':
-    imput = 'test_Pathway020.mp3'
-    file_name, file_extension = imput.split('.')
-    path = './to_separate/' + imput
+    name_input = 'test_Pathway020.mp3'
+    file_name, file_extension = name_input.split('.')
+    path = './to_separate/' + name_input
 
     n_instruments = 3
 
