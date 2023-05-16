@@ -14,12 +14,11 @@ import os
 
 def decompose(V: np.ndarray, n_instruments: int, variant='', number_of_iterations=20):
     n_components = n_instruments * 4
-
+    W = np.random.uniform(0, 1, (V.shape[0], n_components))
+    H = np.random.uniform(0, 1, (n_components, V.shape[1]))
     if variant == 'librosa':
         W, H = librosa.decompose.decompose(V, n_components=n_components, sort=True)
-    else:
-        W = np.random.uniform(0, 1, (V.shape[0], n_components))
-        H = np.random.uniform(0, 1, (n_components, V.shape[1]))
+    elif variant == 'euclidian':
         for iteration in range(number_of_iterations):
             WTV = W.T@V
             WTWH = W.T@W@H
@@ -31,6 +30,30 @@ def decompose(V: np.ndarray, n_instruments: int, variant='', number_of_iteration
             for i in range(W.shape[0]):
                 for j in range(W.shape[1]):
                     W[i][j] = W[i][j] * VHT[i][j] / WHHT[i][j]
+    elif variant == 'divergence':
+        V = np.float64(V)
+        print(V.shape)
+        print(H.shape)
+        print(W.shape)
+        for iteration in range(number_of_iterations):
+            for i in range(H.shape[0]):
+                for j in range(H.shape[1]):
+                    numerator = 0
+                    for row in range(V.shape[0]):
+                        numerator += W[row][i]@V[row][j] / (W@H)[row][j]
+                    denominator = 0
+                    for row in range(W.shape[0]):
+                        denominator += W[row][i]
+                    H[i][j] = H[i][j] * numerator / denominator
+            for i in range(W.shape[0]):
+                for j in range(W.shape[1]):
+                    numerator = 0
+                    for column in range(V.shape[1]):
+                        numerator += H[j][column]@V[i][column] / (W@H)[i][column]
+                    denominator = 0
+                    for column in range(H.shape[1]):
+                        denominator += H[j][column]
+                    W[i][j] = W[i][j] * numerator / denominator
     return W, H
 
 if __name__ == '__main__':
@@ -47,7 +70,7 @@ if __name__ == '__main__':
     spectrogram = librosa.stft(audio_sample, n_fft=n_fft, hop_length=hop_length)
     magnitude, phase = librosa.magphase(spectrogram)
 
-    W, H = decompose(magnitude, n_instruments, variant='our')
+    W, H = decompose(magnitude, n_instruments, variant='divergence')
 
     V = np.dot(W, H)
     V = np.multiply(V, phase)
