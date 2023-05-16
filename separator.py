@@ -11,13 +11,14 @@ import time
 # from IPython.display import Audio
 
 
+CPI = 5 # Components per instrument
 
 
-def decompose(V: np.ndarray, n_instruments: int, variant='', number_of_iterations=100):
-    n_components = n_instruments * 4
+def decompose(V: np.ndarray, n_instruments: int, variant='', number_of_iterations=20):
+    n_components = n_instruments * CPI
     W = np.random.uniform(0, 1, (V.shape[0], n_components))
     H = np.random.uniform(0, 1, (n_components, V.shape[1]))
-    # cycle_t = time.time()
+    cycle_t = time.time()
 
     if variant == 'librosa':
         W, H = librosa.decompose.decompose(V, n_components=n_components, sort=True)
@@ -35,7 +36,7 @@ def decompose(V: np.ndarray, n_instruments: int, variant='', number_of_iteration
                 for j in range(W.shape[1]):
                     W[i][j] = W[i][j] * VHT[i][j] / WHHT[i][j]
             print(time.time() - cycle_t)
-            # cycle_t = time.time()
+            cycle_t = time.time()
 
     elif variant == 'divergence':
         V = np.float64(V)
@@ -65,10 +66,33 @@ def decompose(V: np.ndarray, n_instruments: int, variant='', number_of_iteration
                         denominator += H[j][column]
                     W_new[i][j] = W[i][j] * numerator / denominator
             W, H = W_new, H_new
-            # print(time.time() - cycle_t)
-            # cycle_t = time.time()
+            print(time.time() - cycle_t)
+            cycle_t = time.time()
 
     return W, H
+
+
+def get_component(W: np.ndarray, H: np.ndarray):
+    for i in range(W.shape[1]):
+        yield np.dot(W[:, i][np.newaxis].T, H[i][np.newaxis])
+
+
+def write_components(W: np.ndarray, H: np.ndarray, phase: np.ndarray):
+    iterations = W.shape[1]
+    components = get_component(W, H)
+    recovery_spec = np.full((W@H).shape, 0)
+
+    for i in range(iterations):
+        component = next(components)
+        component = np.multiply(component, phase)
+        signal = librosa.istft(component, n_fft=n_fft, hop_length=hop_length)
+
+        sf.write(f'./separated/{file_name}/component{i+1}.wav', signal, sampling_rate)
+
+        recovery_spec = np.add(recovery_spec, component)
+
+    return librosa.istft(recovery_spec, n_fft=n_fft, hop_length=hop_length)
+
 
 if __name__ == '__main__':
     name_input = 'test_Pathway.wav'
@@ -86,14 +110,17 @@ if __name__ == '__main__':
 
     W, H = decompose(magnitude, n_instruments, variant='euclidian')
 
-    V = np.dot(W, H)
-    V = np.multiply(V, phase)
-    recovered_signal = librosa.istft(V, n_fft=n_fft, hop_length=hop_length)
-
     try:
         os.mkdir(f'./separated/{file_name}')
     except FileExistsError:
         shutil.rmtree(f'./separated/{file_name}')
         os.mkdir(f'./separated/{file_name}')
 
-    sf.write(f'./separated/{file_name}/recovered.wav', recovered_signal, sampling_rate)
+    recovered_signal = write_components(W, H, phase)
+    sf.write(f'./separated/{file_name}/recovered(1).wav', recovered_signal, sampling_rate)
+
+    V = np.dot(W, H)
+    V = np.multiply(V, phase)
+    recovered_signal = librosa.istft(V, n_fft=n_fft, hop_length=hop_length)
+
+    sf.write(f'./separated/{file_name}/recovered(0).wav', recovered_signal, sampling_rate)
