@@ -1,19 +1,11 @@
-import argparse
-import subprocess
-from math import inf, log
 import matplotlib.pyplot as plt
 import numpy as np
-from statistics import stdev
 from separator import decompose
 import librosa
 import time
 
-
-
-#signal-noise-ratio
-
 def execute_decomposition_n_times(number_of_components):
-    times = [[], []] #lib, our, long
+    times = [[], [], []]
     components = []
     name_input = 'PathwayMono.wav'
     path = './to_separate/' + name_input
@@ -36,10 +28,10 @@ def execute_decomposition_n_times(number_of_components):
         decompose(magnitude, n_instruments, number_of_components, variant='euclidian')
         end = time.time()
         times[1].append(end - start)
-        # start = time.time()
-        # decompose(magnitude, n_instruments, number_of_components, variant='divergence')
-        # end = time.time()
-        # times[2].append(end - start)
+        start = time.time()
+        decompose(magnitude, n_instruments, number_of_components, variant='divergence')
+        end = time.time()
+        times[2].append(end - start)
         components.append(n)
         print(n)
     return times, components
@@ -48,7 +40,7 @@ def build_graph(time, components):
     br1 = np.arange(len(components))
     plt.plot(br1, time[0], color='darkviolet', label='librosa')
     plt.plot(br1, time[1], color='gold', label='euclidian')
-    # plt.plot(br1, time[2], color='darkcyan', label='divergence')
+    plt.plot(br1, time[2], color='darkcyan', label='divergence')
     plt.xlabel("Number of components per instrument")
     plt.ylabel("Execution time")
     plt.xticks([r for r in range(len(components))], components)
@@ -57,28 +49,6 @@ def build_graph(time, components):
     plt.savefig(f"time_dependency.pdf")
     plt.cla()
 
-
-
-def snr(x, r):
-    numerator = 0
-    for t in range(len(x)):
-        numerator += x[t]**2
-    denominator = 0
-    for t in range(len(x)):
-        denominator += (x[t]-r[t])**2
-
-    snr = 10*log(numerator/denominator, 10)
-    return snr
-
-
 if __name__ == "__main__":
-    # times, components = execute_decomposition_n_times(25)
-    # build_graph(times, components)
-    x_path = "./to_separate/test_Pathway.wav"
-    r0_path = "./separated/test_Pathway/recovered(0).wav"
-    r1_path = "./separated/test_Pathway/recovered(1).wav"
-    x_audio_sample, x_sampling_rate = librosa.load(x_path)
-    r0_a_s, r0_s_r = librosa.load(r0_path)
-    r1_a_s, r1_s_r = librosa.load(r1_path)
-    print(snr(x_audio_sample, r0_a_s))
-    print(snr(x_audio_sample, r1_a_s))
+    times, components = execute_decomposition_n_times(10)
+    build_graph(times, components)
