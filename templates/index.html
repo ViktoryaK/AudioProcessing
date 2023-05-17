@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Audio processing</title>
+    <link rel="stylesheet" href="../static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div>
+        <span>Processing an Audio file</span>
+        <form action="#" method="post">
+              <label for="name">Enter the name of file you want to process</label>
+            <input type="text" id="name" name="name">
+            <label for="instruments">Number of instruments: </label>
+            <input type="text" id="instruments" name="instruments">
+            <label for="cpi">Components per instrument: </label>
+            <input type="text" id="cpi" name="cpi">
+            <span>Choose a method</span>
+             <input type="radio" id="librosa" name="method" value="librosa">
+              <label for="librosa">Librosa</label><br>
+              <input type="radio" id="euclidian" name="method" value="euclidian">
+              <label for="euclidian">Euclidian distance</label><br>
+              <input type="radio" id="divergence" name="method" value="divergence">
+              <label for="divergence">Divergence</label>
+    <input type="submit" value="Submit" class="input">
+        </form>
+    </div>
+
+</body>
+</html>
