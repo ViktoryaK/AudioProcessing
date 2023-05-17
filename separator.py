@@ -1,20 +1,12 @@
 import librosa
 import numpy as np
-import matplotlib.pyplot as plt
-from scipy.fft import fft, fftfreq, ifft
-from scipy import signal
-import scipy
-from sklearn.decomposition import NMF
 import soundfile as sf
 import os, shutil
 import time
-# from IPython.display import Audio
+from math import inf, log
 
 
-CPI = 5 # Components per instrument
-
-
-def decompose(V: np.ndarray, n_instruments: int, variant='', number_of_iterations=20):
+def decompose(V: np.ndarray, n_instruments: int, CPI,  variant='', number_of_iterations=20):
     n_components = n_instruments * CPI
     W = np.random.uniform(0, 1, (V.shape[0], n_components))
     H = np.random.uniform(0, 1, (n_components, V.shape[1]))
@@ -35,8 +27,8 @@ def decompose(V: np.ndarray, n_instruments: int, variant='', number_of_iteration
             for i in range(W.shape[0]):
                 for j in range(W.shape[1]):
                     W[i][j] = W[i][j] * VHT[i][j] / WHHT[i][j]
-            print(time.time() - cycle_t)
-            cycle_t = time.time()
+            # print(time.time() - cycle_t)
+            # cycle_t = time.time()
 
     elif variant == 'divergence':
         V = np.float64(V)
@@ -66,8 +58,8 @@ def decompose(V: np.ndarray, n_instruments: int, variant='', number_of_iteration
                         denominator += H[j][column]
                     W_new[i][j] = W[i][j] * numerator / denominator
             W, H = W_new, H_new
-            print(time.time() - cycle_t)
-            cycle_t = time.time()
+            # print(time.time() - cycle_t)
+            # cycle_t = time.time()
 
     return W, H
 
@@ -94,12 +86,14 @@ def write_components(W: np.ndarray, H: np.ndarray, phase: np.ndarray):
     return librosa.istft(recovery_spec, n_fft=n_fft, hop_length=hop_length)
 
 
+
 if __name__ == '__main__':
     name_input = 'test_Pathway.wav'
     file_name, file_extension = name_input.split('.')
     path = './to_separate/' + name_input
 
     n_instruments = 3
+    CPI = 5 #components per instrument
 
     audio_sample, sampling_rate = librosa.load(path)
 
@@ -108,7 +102,7 @@ if __name__ == '__main__':
     spectrogram = librosa.stft(audio_sample, n_fft=n_fft, hop_length=hop_length)
     magnitude, phase = librosa.magphase(spectrogram)
 
-    W, H = decompose(magnitude, n_instruments, variant='euclidian')
+    W, H = decompose(magnitude, n_instruments, CPI,  variant='euclidian')
 
     try:
         os.mkdir(f'./separated/{file_name}')
