@@ -2,6 +2,11 @@ import librosa
 import numpy as np
 import soundfile as sf
 import os, shutil
+import time
+from flask import Flask, render_template, url_for, redirect, request
+from math import inf, log
+app = Flask(__name__, static_folder='static')
+
 
 
 def euclidian_distance(V: np.ndarray, W: np.ndarray, H: np.ndarray):
@@ -27,11 +32,10 @@ def divergence(V: np.ndarray, W: np.ndarray, H: np.ndarray):
   return diver
 
 
-def decompose(V: np.ndarray, n_instruments: int, variant='euclidian', cpi=4, number_of_iterations=20, threshold=1e-4):
+def decompose(V, n_instruments, variant, cpi=4, number_of_iterations=20, threshold=1e-4):
     n_components = n_instruments * cpi
     W = np.random.uniform(0, 1, (V.shape[0], n_components))
     H = np.random.uniform(0, 1, (n_components, V.shape[1]))
-
     if variant == 'librosa':
         W, H = librosa.decompose.decompose(V, n_components=n_components, sort=True)
 
@@ -85,12 +89,13 @@ def decompose(V: np.ndarray, n_instruments: int, variant='euclidian', cpi=4, num
     return W, H
 
 
+
 def get_component(W: np.ndarray, H: np.ndarray):
     for i in range(W.shape[1]):
         yield np.dot(W[:, i][np.newaxis].T, H[i][np.newaxis])
 
 
-def write_components(W: np.ndarray, H: np.ndarray, phase: np.ndarray):
+def write_components(W: np.ndarray, H: np.ndarray, phase: np.ndarray, file_name, n_fft, hop_length, sampling_rate):
     iterations = W.shape[1]
     components = get_component(W, H)
     recovery_spec = np.full((W@H).shape, 0)
@@ -106,14 +111,21 @@ def write_components(W: np.ndarray, H: np.ndarray, phase: np.ndarray):
 
     return librosa.istft(recovery_spec, n_fft=n_fft, hop_length=hop_length)
 
+@app.route("/", methods=["POST", "GET"])
+def login():
+    if request.method == "POST":
+        name_input = request.form['name']
+        n_instruments = int(request.form['instruments'])
+        CPI = int(request.form['instruments'])  # components per instrument
+        variant = request.form['method']
+        separate(name_input, n_instruments, variant, CPI)
 
-if __name__ == '__main__':
-    name_input = 'test_Pathway.wav'
+    return render_template('index.html')
+
+
+def separate(name_input, n_instruments, CPI, var):
     file_name, file_extension = name_input.split('.')
     path = './to_separate/' + name_input
-
-    n_instruments = 3
-    cpi = 5 #components per instrument
 
     audio_sample, sampling_rate = librosa.load(path)
 
@@ -121,8 +133,7 @@ if __name__ == '__main__':
     hop_length = 512
     spectrogram = librosa.stft(audio_sample, n_fft=n_fft, hop_length=hop_length)
     magnitude, phase = librosa.magphase(spectrogram)
-
-    W, H = decompose(magnitude, n_instruments=n_instruments, variant='euclidian', cpi=cpi)
+    W, H = decompose(magnitude, n_instruments, CPI, var)
 
     try:
         os.mkdir(f'./separated/{file_name}')
@@ -130,7 +141,7 @@ if __name__ == '__main__':
         shutil.rmtree(f'./separated/{file_name}')
         os.mkdir(f'./separated/{file_name}')
 
-    recovered_signal = write_components(W, H, phase)
+    recovered_signal = write_components(W, H, phase, file_name, n_fft, hop_length, sampling_rate)
     sf.write(f'./separated/{file_name}/recovered(1).wav', recovered_signal, sampling_rate)
 
     V = np.dot(W, H)
@@ -138,3 +149,8 @@ if __name__ == '__main__':
     recovered_signal = librosa.istft(V, n_fft=n_fft, hop_length=hop_length)
 
     sf.write(f'./separated/{file_name}/recovered(0).wav', recovered_signal, sampling_rate)
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
+    # separate('test_Pathway.wav', 3, 5, 'euclidian')
