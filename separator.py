@@ -2,20 +2,41 @@ import librosa
 import numpy as np
 import soundfile as sf
 import os, shutil
-import time
-from math import inf, log
 
 
-def decompose(V: np.ndarray, n_instruments: int, CPI,  variant='', number_of_iterations=20):
-    n_components = n_instruments * CPI
+def euclidian_distance(V: np.ndarray, W: np.ndarray, H: np.ndarray):
+    dist = 0
+    product = np.matmul(W, H)
+    for i in range(len(V)):
+        for j in range(len(V[0])):
+            dist += (V[i][j] - product[i][j])**2
+
+    return dist
+
+
+def divergence(V: np.ndarray, W: np.ndarray, H: np.ndarray):
+  diver = 0
+  product = np.matmul(W, H)
+  for i in range(len(V)):
+      for j in range(len(V[0])):
+          diver += (
+              V[i][j] * np.log(V[i][j] / product[i][j]) -
+              V[i][j] + product[i][j]
+          )
+
+  return diver
+
+
+def decompose(V: np.ndarray, n_instruments: int, variant='euclidian', cpi=4, number_of_iterations=20, threshold=1e-4):
+    n_components = n_instruments * cpi
     W = np.random.uniform(0, 1, (V.shape[0], n_components))
     H = np.random.uniform(0, 1, (n_components, V.shape[1]))
-    cycle_t = time.time()
 
     if variant == 'librosa':
         W, H = librosa.decompose.decompose(V, n_components=n_components, sort=True)
 
     elif variant == 'euclidian':
+        distance = euclidian_distance(V, W, H)
         for iteration in range(number_of_iterations):
             WTV = W.T@V
             WTWH = W.T@W@H
@@ -27,14 +48,13 @@ def decompose(V: np.ndarray, n_instruments: int, CPI,  variant='', number_of_ite
             for i in range(W.shape[0]):
                 for j in range(W.shape[1]):
                     W[i][j] = W[i][j] * VHT[i][j] / WHHT[i][j]
-            # print(time.time() - cycle_t)
-            # cycle_t = time.time()
+            new_distance = euclidian_distance(V, W, H)
+            if (distance-new_distance) >= 0 and (distance-new_distance <= threshold):
+                break
 
     elif variant == 'divergence':
         V = np.float64(V)
-        # print(V.shape)
-        # print(H.shape)
-        # print(W.shape)
+        diver = divergence(V, W, H)
 
         for iteration in range(number_of_iterations):
             W_new, H_new = W.copy(), H.copy()
@@ -58,8 +78,9 @@ def decompose(V: np.ndarray, n_instruments: int, CPI,  variant='', number_of_ite
                         denominator += H[j][column]
                     W_new[i][j] = W[i][j] * numerator / denominator
             W, H = W_new, H_new
-            # print(time.time() - cycle_t)
-            # cycle_t = time.time()
+            new_diver = divergence(V, W, H)
+            if (diver-new_diver) >= 0 and (diver-new_diver <= threshold):
+                break
 
     return W, H
 
@@ -86,14 +107,13 @@ def write_components(W: np.ndarray, H: np.ndarray, phase: np.ndarray):
     return librosa.istft(recovery_spec, n_fft=n_fft, hop_length=hop_length)
 
 
-
 if __name__ == '__main__':
     name_input = 'test_Pathway.wav'
     file_name, file_extension = name_input.split('.')
     path = './to_separate/' + name_input
 
     n_instruments = 3
-    CPI = 5 #components per instrument
+    cpi = 5 #components per instrument
 
     audio_sample, sampling_rate = librosa.load(path)
 
@@ -102,7 +122,7 @@ if __name__ == '__main__':
     spectrogram = librosa.stft(audio_sample, n_fft=n_fft, hop_length=hop_length)
     magnitude, phase = librosa.magphase(spectrogram)
 
-    W, H = decompose(magnitude, n_instruments, CPI,  variant='euclidian')
+    W, H = decompose(magnitude, n_instruments=n_instruments, variant='euclidian', cpi=cpi)
 
     try:
         os.mkdir(f'./separated/{file_name}')
