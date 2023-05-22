@@ -116,7 +116,7 @@ def login():
     if request.method == "POST":
         name_input = request.form['name']
         n_instruments = int(request.form['instruments'])
-        CPI = int(request.form['instruments'])  # components per instrument
+        CPI = int(request.form['cpi'])  # components per instrument
         variant = request.form['method']
         separate(name_input, n_instruments, variant, CPI)
 
